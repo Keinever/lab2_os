@@ -1,28 +1,15 @@
-# If KERNELRELEASE is defined, we've been invoked from the
-# kernel build system and can use its language.
-ifneq ($(KERNELRELEASE),)
 obj-m += kmod.o
-# Otherwise we were called directly from the command
-# line; invoke the kernel build system.
-else
-KERNELDIR ?= /lib/modules/$(shell uname -r)/build
-PWD := $(shell pwd)
 
-default:    driver
+all:
+	echo "Targets: clean, build, install"
 
-rebuild:    clean driver
+build:
+	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 
 clean:
-    rm -rf .tmp_versions
-    rm -f .*.cmd
-    rm -f Module.symvers
-    rm -f modules.order
-    rm -f *.ko
-    rm -f *.o
-    rm -f *.mod.*
-    rm -f ../kmod.ko
+	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
 
-driver:
-    $(MAKE) -C $(KERNELDIR) M=$(PWD) modules
-    cp kmod.ko ../kmod.ko
-endif
+install: build
+	sudo rmmod kmod.ko
+	sudo insmod kmod.ko
+	sudo chmod 777 /proc/kmod
