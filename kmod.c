@@ -27,7 +27,7 @@ static int write_net_info(char __user *buffer, loff_t *offset, size_t buffer_len
 
         len += sprintf(procfs_buffer, "TCP Connections:\n");
 
-        idr_for_each_entry(net_generic(sock_net(current->files->f_path.dentry->d_inode->i_sb), tcp_hashinfo), &iter, &iter4) {
+        tcp_for_each_entry(net_generic(sock_net(current->files->f_path.dentry->d_inode->i_sb), tcp_hashinfo), &iter, &iter4) {
             len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &iter.inode->i_sb, ntohs(iter.inode->i_ino));
             len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &iter.inode->i_sb, ntohs(iter.inode->i_ino));
             len += sprintf(procfs_buffer + len, "State: %u\n", tcp_sk_state(tcp_sk(iter.sk)));
@@ -38,7 +38,7 @@ static int write_net_info(char __user *buffer, loff_t *offset, size_t buffer_len
 
         len += sprintf(procfs_buffer, "UDP Connections:\n");
 
-        idr_for_each_entry(net_generic(sock_net(current->files->f_path.dentry->d_inode->i_sb), udp_hashinfo), &iter) {
+        udp_for_each_entry(net_generic(sock_net(current->files->f_path.dentry->d_inode->i_sb), udp_hashinfo), &iter) {
             len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &iter.inode->i_sb, ntohs(iter.inode->i_ino));
             len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &iter.inode->i_sb, ntohs(iter.inode->i_ino));
             len += sprintf(procfs_buffer + len, "\n");
