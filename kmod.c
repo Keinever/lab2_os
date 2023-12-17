@@ -4,6 +4,7 @@
 #include <linux/proc_fs.h>
 #include <linux/uaccess.h>
 #include <linux/net.h>
+#include <linux/inet.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <net/udp.h>
@@ -20,30 +21,50 @@ static DEFINE_MUTEX(args_mutex);
 
 static int write_net_info(char __user *buffer, loff_t *offset, size_t buffer_length) {
     int len = 0;
+    struct net *net;
+    struct proto_iter iter;
 
     if (struct_id == 1) { // TCP
-        struct tcp_iter_state iter;
-        struct tcp4_iter_state iter4;
+        struct tcp_iter_state tcp_iter_state;
 
         len += sprintf(procfs_buffer, "TCP Connections:\n");
 
-        tcp_for_each_entry(net_generic(sock_net(current->files->f_path.dentry->d_inode->i_sb), tcp_hashinfo), &iter, &iter4) {
-            struct sock *sk = tcp_sk(iter.inode);
-            len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &sk->sk_rcv_saddr, ntohs(sk->sk_rcv_sport));
-            len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &sk->sk_daddr, ntohs(sk->sk_dport));
-            len += sprintf(procfs_buffer + len, "State: %u\n", tcp_sk_state(sk));
-            len += sprintf(procfs_buffer + len, "\n");
+        read_lock(&tasklist_lock);
+        rcu_read_lock();
+
+        for_each_net(net) {
+            proto_iter_net(net, &iter, &tcp_prot);
+            tcp_for_each_entry(net, &iter, &tcp_iter_state) {
+                struct sock *sk = tcp_iter_state.sk;
+                len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &sk->sk_rcv_saddr, ntohs(sk->sk_rcv_sport));
+                len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &sk->sk_daddr, ntohs(sk->sk_dport));
+                len += sprintf(procfs_buffer + len, "State: %u\n", tcp_sk_state(sk));
+                len += sprintf(procfs_buffer + len, "\n");
+            }
         }
+
+        rcu_read_unlock();
+        read_unlock(&tasklist_lock);
     } else if (struct_id == 2) { // UDP
-        struct udp_iter_state iter;
+        struct udp_iter_state udp_iter_state;
 
         len += sprintf(procfs_buffer, "UDP Connections:\n");
 
-        udp_for_each_entry(net_generic(sock_net(current->files->f_path.dentry->d_inode->i_sb), udp_hashinfo), &iter) {
-            len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &iter.inode->i_sb, ntohs(iter.inode->i_ino));
-            len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &iter.inode->i_sb, ntohs(iter.inode->i_ino));
-            len += sprintf(procfs_buffer + len, "\n");
+        read_lock(&tasklist_lock);
+        rcu_read_lock();
+
+        for_each_net(net) {
+            proto_iter_net(net, &iter, &udp_prot);
+            udp_for_each_entry(net, &iter, &udp_iter_state) {
+                struct sock *sk = udp_iter_state.sk;
+                len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &sk->sk_rcv_saddr, ntohs(sk->sk_rcv_sport));
+                len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &sk->sk_daddr, ntohs(sk->sk_dport));
+                len += sprintf(procfs_buffer + len, "\n");
+            }
         }
+
+        rcu_read_unlock();
+        read_unlock(&tasklist_lock);
     } else {
         return -EFAULT;
     }
