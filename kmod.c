@@ -57,10 +57,10 @@ static int write_net_info(char __user *buffer, loff_t *offset, size_t buffer_len
         len += sprintf(procfs_buffer, "UDP Connections:\n");
 
         for_each_net(net) {
-            udp_prot->iter_net(net, &iter, udp_hashinfo);
-
             struct hlist_nulls_node *node;
             struct udp_sock *up;
+
+            udp_prot->iter_net(net, &iter, udp_hashinfo);
 
             hlist_nulls_for_each_entry(up, node, &iter.udp_hash, node) {
                 len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &up->sk.sk_rcv_saddr, ntohs(up->sk.sk_rcv_sport));
