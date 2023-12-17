@@ -4,10 +4,10 @@
 #include <linux/proc_fs.h>
 #include <linux/uaccess.h>
 #include <linux/net.h>
-#include <linux/inet.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <net/udp.h>
+#include <linux/netdevice.h>
 
 #define PROCFS_MAX_SIZE 1024
 #define PROCFS_NAME "lab2"
@@ -23,7 +23,6 @@ static int write_net_info(char __user *buffer, loff_t *offset, size_t buffer_len
     int len = 0;
 
     if (struct_id == 1) { // TCP
-        struct net *net;
         struct proto_iter iter;
         struct proto *prot;
 
@@ -33,7 +32,11 @@ static int write_net_info(char __user *buffer, loff_t *offset, size_t buffer_len
 
         for_each_net(net) {
             proto_iter_net(net, &iter, &tcp_prot);
-            prot = &iter.prot;
+            prot = iter.proto;
+
+            if (!prot)
+                continue;
+
             read_lock(&prot->slab_lock);
             struct hlist_nulls_node *node;
             struct sock *sk;
@@ -49,30 +52,22 @@ static int write_net_info(char __user *buffer, loff_t *offset, size_t buffer_len
 
         rcu_read_unlock();
     } else if (struct_id == 2) { // UDP
-        struct net *net;
-        struct proto_iter iter;
-        struct proto *prot;
+        struct udp_iter_state iter;
 
         len += sprintf(procfs_buffer, "UDP Connections:\n");
 
-        rcu_read_lock();
-
         for_each_net(net) {
-            proto_iter_net(net, &iter, &udp_prot);
-            prot = &iter.prot;
-            read_lock(&prot->slab_lock);
-            struct hlist_nulls_node *node;
-            struct sock *sk;
+            udp_prot->iter_net(net, &iter, udp_hashinfo);
 
-            hlist_nulls_for_each_entry(sk, node, &prot->hlist_nulls, node) {
-                len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &sk->sk_rcv_saddr, ntohs(sk->sk_rcv_sport));
-                len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &sk->sk_daddr, ntohs(sk->sk_dport));
+            struct hlist_nulls_node *node;
+            struct udp_sock *up;
+
+            hlist_nulls_for_each_entry(up, node, &iter.udp_hash, node) {
+                len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &up->sk.sk_rcv_saddr, ntohs(up->sk.sk_rcv_sport));
+                len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &up->sk.sk_daddr, ntohs(up->sk.sk_dport));
                 len += sprintf(procfs_buffer + len, "\n");
             }
-            read_unlock(&prot->slab_lock);
         }
-
-        rcu_read_unlock();
     } else {
         return -EFAULT;
     }
@@ -142,7 +137,7 @@ static const struct proc_ops proc_file_fops = {
 
 static int __init procfs2_init(void) {
     our_proc_file = proc_create(PROCFS_NAME, 0644, NULL, &proc_file_fops);
-    if (!our_proc_file) {
+    if (NULL == our_proc_file) {
         pr_alert("Error: Could not initialize /proc/%s\n", PROCFS_NAME);
         return -ENOMEM;
     }
