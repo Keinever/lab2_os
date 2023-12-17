@@ -22,56 +22,7 @@ static DEFINE_MUTEX(args_mutex);
 static int write_net_info(char __user *buffer, loff_t *offset, size_t buffer_length) {
     int len = 0;
 
-    if (struct_id == 1) { // TCP
-        struct proto_iter iter;
-        struct proto *prot;
-
-        len += sprintf(procfs_buffer, "TCP Connections:\n");
-
-        rcu_read_lock();
-
-        for_each_net(net) {
-            proto_iter_net(net, &iter, &tcp_prot);
-            prot = iter.proto;
-
-            if (!prot)
-                continue;
-
-            read_lock(&prot->slab_lock);
-            struct hlist_nulls_node *node;
-            struct sock *sk;
-
-            hlist_nulls_for_each_entry(sk, node, &prot->hlist_nulls, node) {
-                len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &sk->sk_rcv_saddr, ntohs(sk->sk_rcv_sport));
-                len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &sk->sk_daddr, ntohs(sk->sk_dport));
-                len += sprintf(procfs_buffer + len, "State: %u\n", tcp_sk_state(sk));
-                len += sprintf(procfs_buffer + len, "\n");
-            }
-            read_unlock(&prot->slab_lock);
-        }
-
-        rcu_read_unlock();
-    } else if (struct_id == 2) { // UDP
-        struct udp_iter_state iter;
-
-        len += sprintf(procfs_buffer, "UDP Connections:\n");
-
-        for_each_net(net) {
-            struct hlist_nulls_node *node;
-            struct udp_sock *up;
-
-            udp_prot->iter_net(net, &iter, udp_hashinfo);
-
-            hlist_nulls_for_each_entry(up, node, &iter.udp_hash, node) {
-                len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &up->sk.sk_rcv_saddr, ntohs(up->sk.sk_rcv_sport));
-                len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &up->sk.sk_daddr, ntohs(up->sk.sk_dport));
-                len += sprintf(procfs_buffer + len, "\n");
-            }
-        }
-    } else {
-        return -EFAULT;
-    }
-
+    len += sprintf(procfs_buffer + len, "Hello");
     pr_info("off: %lld len: %d", *offset, len);
 
     if (*offset >= len) {
