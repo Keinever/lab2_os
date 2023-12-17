@@ -28,9 +28,10 @@ static int write_net_info(char __user *buffer, loff_t *offset, size_t buffer_len
         len += sprintf(procfs_buffer, "TCP Connections:\n");
 
         tcp_for_each_entry(net_generic(sock_net(current->files->f_path.dentry->d_inode->i_sb), tcp_hashinfo), &iter, &iter4) {
-            len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &iter.inode->i_sb, ntohs(iter.inode->i_ino));
-            len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &iter.inode->i_sb, ntohs(iter.inode->i_ino));
-            len += sprintf(procfs_buffer + len, "State: %u\n", tcp_sk_state(tcp_sk(iter.sk)));
+            struct sock *sk = tcp_sk(iter.inode);
+            len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &sk->sk_rcv_saddr, ntohs(sk->sk_rcv_sport));
+            len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &sk->sk_daddr, ntohs(sk->sk_dport));
+            len += sprintf(procfs_buffer + len, "State: %u\n", tcp_sk_state(sk));
             len += sprintf(procfs_buffer + len, "\n");
         }
     } else if (struct_id == 2) { // UDP
@@ -112,7 +113,7 @@ static const struct proc_ops proc_file_fops = {
 
 static int __init procfs2_init(void) {
     our_proc_file = proc_create(PROCFS_NAME, 0644, NULL, &proc_file_fops);
-    if (NULL == our_proc_file) {
+    if (!our_proc_file) {
         pr_alert("Error: Could not initialize /proc/%s\n", PROCFS_NAME);
         return -ENOMEM;
     }
