@@ -1,5 +1,9 @@
-#include <linux/kernel.h>
+#include <linux/kernel.h>  
 #include <linux/module.h>
+
+#define MODULE
+#define LINUX
+#define __KERNEL__
 
 static int __init my_module_init(void) {
     pr_info("Hello from my kernel module!\n");
