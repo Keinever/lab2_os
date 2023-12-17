@@ -22,19 +22,19 @@ static int write_net_info(char __user *buffer, loff_t *offset, size_t buffer_len
     int len = 0;
 
     if (struct_id == 1) { // TCP
-        struct tcp_iter_state iter;
-        struct tcp4_iter_state iter4;
+        struct tcp_iter_state iter = { .seq = 0 };
+        struct tcp4_iter_state iter4 = { .seq = 0 };
 
         len += sprintf(procfs_buffer, "TCP Connections:\n");
 
         tcp_for_each_entry(net_generic(sock_net(buffer->sk), tcp_hashinfo), &iter, &iter4) {
             len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &iter.inode->i_sb, ntohs(iter.inode->i_ino));
             len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &iter.inode->i_sb, ntohs(iter.inode->i_ino));
-            len += sprintf(procfs_buffer + len, "State: %d\n", tcp_sk_state(buffer->sk));
+            len += sprintf(procfs_buffer + len, "State: %u\n", tcp_sk_state(tcp_sk(iter.sk)));
             len += sprintf(procfs_buffer + len, "\n");
         }
     } else if (struct_id == 2) { // UDP
-        struct udp_iter_state iter;
+        struct udp_iter_state iter = { .seq = 0 };
 
         len += sprintf(procfs_buffer, "UDP Connections:\n");
 
@@ -49,7 +49,7 @@ static int write_net_info(char __user *buffer, loff_t *offset, size_t buffer_len
         return -EFAULT;
     }
 
-    printk("off: %lld len: %d", *offset, len);
+    pr_info("off: %lld len: %d", *offset, len);
 
     if (*offset >= len) {
         pr_info("Can't copy to user space. By offset\n");
@@ -115,7 +115,6 @@ static const struct proc_ops proc_file_fops = {
 static int __init procfs2_init(void) {
     our_proc_file = proc_create(PROCFS_NAME, 0644, NULL, &proc_file_fops);
     if (NULL == our_proc_file) {
-        proc_remove(our_proc_file);
         pr_alert("Error: Could not initialize /proc/%s\n", PROCFS_NAME);
         return -ENOMEM;
     }
