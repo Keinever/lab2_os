@@ -22,29 +22,27 @@ static int write_net_info(char __user *buffer, loff_t *offset, size_t buffer_len
     int len = 0;
 
     if (struct_id == 1) { // TCP
-        struct tcp_iter_state iter = { .seq = 0 };
-        struct tcp4_iter_state iter4 = { .seq = 0 };
+        struct tcp_iter_state iter;
+        struct tcp4_iter_state iter4;
 
         len += sprintf(procfs_buffer, "TCP Connections:\n");
 
-        tcp_for_each_entry(net_generic(sock_net(buffer->sk), tcp_hashinfo), &iter, &iter4) {
+        tcp_for_each_entry(net_generic(sock_net(current->files->f_path.dentry->d_inode->i_sb), tcp_hashinfo), &iter, &iter4) {
             len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &iter.inode->i_sb, ntohs(iter.inode->i_ino));
             len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &iter.inode->i_sb, ntohs(iter.inode->i_ino));
             len += sprintf(procfs_buffer + len, "State: %u\n", tcp_sk_state(tcp_sk(iter.sk)));
             len += sprintf(procfs_buffer + len, "\n");
         }
     } else if (struct_id == 2) { // UDP
-        struct udp_iter_state iter = { .seq = 0 };
+        struct udp_iter_state iter;
 
         len += sprintf(procfs_buffer, "UDP Connections:\n");
 
-        udp4_lib_list(net_generic(sock_net(buffer->sk), udp_hashinfo), &iter);
-
-        do {
+        udp_for_each_entry(net_generic(sock_net(current->files->f_path.dentry->d_inode->i_sb), udp_hashinfo), &iter) {
             len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &iter.inode->i_sb, ntohs(iter.inode->i_ino));
             len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &iter.inode->i_sb, ntohs(iter.inode->i_ino));
             len += sprintf(procfs_buffer + len, "\n");
-        } while (udp4_lib_list_next(net_generic(sock_net(buffer->sk), udp_hashinfo), &iter));
+        }
     } else {
         return -EFAULT;
     }
