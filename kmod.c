@@ -21,50 +21,58 @@ static DEFINE_MUTEX(args_mutex);
 
 static int write_net_info(char __user *buffer, loff_t *offset, size_t buffer_length) {
     int len = 0;
-    struct net *net;
-    struct proto_iter iter;
 
     if (struct_id == 1) { // TCP
-        struct tcp_iter_state tcp_iter_state;
+        struct net *net;
+        struct proto_iter iter;
+        struct proto *prot;
 
         len += sprintf(procfs_buffer, "TCP Connections:\n");
 
-        read_lock(&tasklist_lock);
         rcu_read_lock();
 
         for_each_net(net) {
             proto_iter_net(net, &iter, &tcp_prot);
-            tcp_for_each_entry(net, &iter, &tcp_iter_state) {
-                struct sock *sk = tcp_iter_state.sk;
+            prot = &iter.prot;
+            read_lock(&prot->slab_lock);
+            struct hlist_nulls_node *node;
+            struct sock *sk;
+
+            hlist_nulls_for_each_entry(sk, node, &prot->hlist_nulls, node) {
                 len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &sk->sk_rcv_saddr, ntohs(sk->sk_rcv_sport));
                 len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &sk->sk_daddr, ntohs(sk->sk_dport));
                 len += sprintf(procfs_buffer + len, "State: %u\n", tcp_sk_state(sk));
                 len += sprintf(procfs_buffer + len, "\n");
             }
+            read_unlock(&prot->slab_lock);
         }
 
         rcu_read_unlock();
-        read_unlock(&tasklist_lock);
     } else if (struct_id == 2) { // UDP
-        struct udp_iter_state udp_iter_state;
+        struct net *net;
+        struct proto_iter iter;
+        struct proto *prot;
 
         len += sprintf(procfs_buffer, "UDP Connections:\n");
 
-        read_lock(&tasklist_lock);
         rcu_read_lock();
 
         for_each_net(net) {
             proto_iter_net(net, &iter, &udp_prot);
-            udp_for_each_entry(net, &iter, &udp_iter_state) {
-                struct sock *sk = udp_iter_state.sk;
+            prot = &iter.prot;
+            read_lock(&prot->slab_lock);
+            struct hlist_nulls_node *node;
+            struct sock *sk;
+
+            hlist_nulls_for_each_entry(sk, node, &prot->hlist_nulls, node) {
                 len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &sk->sk_rcv_saddr, ntohs(sk->sk_rcv_sport));
                 len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &sk->sk_daddr, ntohs(sk->sk_dport));
                 len += sprintf(procfs_buffer + len, "\n");
             }
+            read_unlock(&prot->slab_lock);
         }
 
         rcu_read_unlock();
-        read_unlock(&tasklist_lock);
     } else {
         return -EFAULT;
     }
