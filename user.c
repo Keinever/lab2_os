@@ -11,7 +11,7 @@ void help(){
    fprintf(stderr, "Usage: ./user structure_id\n "
                    "Supported structures id: \n "
                    "1 - info about tcp\n "
-                   "2 - info about udp \n");
+                   "2 - info about unix sockets \n");
 }
 
 int main(int argc, char *argv[]){
@@ -42,7 +42,7 @@ int main(int argc, char *argv[]){
 
    char inbuf[4096];
    char outbuf[4096];
-   int fd = open("/proc/lab2", O_RDWR);
+   int fd = open("/proc/my_procfs", O_RDWR);
    sprintf(inbuf, "%s", argv[1]);
 
    write(fd, inbuf, 17);
@@ -50,9 +50,9 @@ int main(int argc, char *argv[]){
    read(fd, outbuf, 4096);
 
    if (structure_ID == 1){
-       printf("task_cputime_atomic structure: \n\n");
+       printf("info about tcp: \n\n");
    } else {
-       printf("syscall_info structure data for PID: \n\n");
+       printf("info about unix sockets: \n\n");
    }
    puts(outbuf);
    return 0;
