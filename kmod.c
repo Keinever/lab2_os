@@ -24,7 +24,7 @@
 
 /* Struct MACRO */
 #define TCP 0
-#define STRUCT_SYSCALL_INFO 1
+#define UNIX_SOCKETS 1
 
 /* Proc directory */
 static struct proc_dir_entry *our_proc_file;
@@ -107,11 +107,11 @@ static ssize_t procfile_read(struct file *filePointer, char __user *procfs_buffe
   mutex_lock(&args_mutex);
     if (struct_id == TCP) {
       mutex_unlock(&args_mutex);
-      return get_tcp_connections(*procfs_buffer);
+      return get_tcp_connections(procfs_buffer);
     }
     if (struct_id == UNIX_SOCKETS) {
       mutex_unlock(&args_mutex);
-      return get_unix_sockets(*procfs_buffer);
+      return get_unix_sockets(procfs_buffer);
     }
   }
   mutex_unlock(&args_mutex);
@@ -136,7 +136,7 @@ static ssize_t procfile_write(struct file *file, const char __user *buff,
   }
 
   /* Read args from input */
-  num_of_args = sscanf(procfs_buffer, "%d %d", &a);
+  num_of_args = sscanf(procfs_buffer, "%d", &a);
   if (num_of_args != 1) {
     pr_info("Invalid number of args\n");
     return -EFAULT;
