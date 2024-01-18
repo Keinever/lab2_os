@@ -18,7 +18,7 @@
 #endif
 
 /* Buffer size */
-#define PROCFS_MAX_SIZE 1024
+#define PROCFS_MAX_SIZE 4096
 /* Name of procfs file */
 #define PROCFS_NAME "my_procfs"
 
