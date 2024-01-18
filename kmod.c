@@ -85,7 +85,6 @@ void get_unix_sockets(char *procfs_buffer) {
     for (hash = 0; hash < UNIX_HASH_SIZE; ++hash) {
       sk_for_each(s, &net->unx.table.buckets[hash]) {
         struct unix_sock *u = unix_sk(s);
-        int state = s->sk_socket->state;
         int type = s->sk_type;
         int inode = SOCK_INODE(s->sk_socket)->i_ino;
 
@@ -98,7 +97,7 @@ void get_unix_sockets(char *procfs_buffer) {
   copy_to_user(procfs_buffer, result, 4096);
 
 
-static ssize_t procfile_read(struct file *filePointer, char __user *buffer, size_t buffer_length, loff_t *offset)  {
+ssize_t procfile_read(struct file *filePointer, char __user *buffer, size_t buffer_length, loff_t *offset)  {
   if (buffer_length < PROCFS_MAX_SIZE) {
     pr_info("Not enough space in buffer\n");
     return -EFAULT;
