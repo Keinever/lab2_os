@@ -98,7 +98,7 @@ void get_unix_sockets(char *procfs_buffer) {
   copy_to_user(procfs_buffer, result, 4096);
 
 
-static ssize_t procfile_read(struct file *file, size_t buffer_length, loff_t *offset) {
+static ssize_t procfile_read(struct file *filePointer, char __user *buffer, size_t buffer_length, loff_t *offset)  {
   if (buffer_length < PROCFS_MAX_SIZE) {
     pr_info("Not enough space in buffer\n");
     return -EFAULT;
@@ -106,17 +106,17 @@ static ssize_t procfile_read(struct file *file, size_t buffer_length, loff_t *of
   mutex_lock(&args_mutex);
     if (struct_id == TCP) {
       mutex_unlock(&args_mutex);
-      get_tcp_connections(procfs_buffer);
+      get_tcp_connections(&buffer);
       return 0;
     }
     if (struct_id == UNIX_SOCKETS) {
       mutex_unlock(&args_mutex);
-      get_unix_sockets(procfs_buffer);
+      get_unix_sockets(&buffer);
       return 0;
     }
   }
   mutex_unlock(&args_mutex);
-  return -1;
+  return -EFAULT;
 }
 
 /* This function calls when user writes to proc file */
