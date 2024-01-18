@@ -4,8 +4,13 @@
 #include <linux/uaccess.h>
 #include <linux/version.h>
 #include <linux/mutex.h>
+#include <net/af_unix.h>
+#include <linux/net.h>
+#include <net/sock.h>
 #include <linux/tcp.h>
+#include <linux/netfilter_ipv4.h>
 #include <linux/ip.h>
+
 #include <linux/sched.h>
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
