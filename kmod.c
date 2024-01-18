@@ -51,7 +51,7 @@ static unsigned int my_hook_func(void *priv, struct sk_buff *skb,
   if (ip_header->protocol == IPPROTO_TCP) {
     tcp_header = tcp_hdr(skb);
 
-    sprintf(buff, "tcp\t%s%pI4:%d->%pI4:%d\n\n", buff, &ip_header->saddr,
+    sprintf(procfs_buffer, "tcp\t%s%pI4:%d->%pI4:%d\n\n", procfs_buffer, &ip_header->saddr,
             ntohs(tcp_header->source), &ip_header->daddr,
             ntohs(tcp_header->dest));
   }
@@ -66,13 +66,13 @@ static struct nf_hook_ops my_hook_ops = {
     .priority = NF_IP_PRI_FIRST,
 };
 
-void get_tcp_connections(char *buff) {
+void get_tcp_connections(char *procfs_buffer) {
   nf_register_net_hook(&init_net, &my_hook_ops);
   mdelay(3000);
   nf_unregister_net_hook(&init_net, &my_hook_ops);
 }
 
-void get_unix_sockets(char *buff) {
+void get_unix_sockets(char *procfs_buffer) {
   struct net *net;
   char result[4096];
   int counter = 0;
@@ -95,10 +95,10 @@ void get_unix_sockets(char *buff) {
       }
     }
   }
-  copy_to_user(buff, result, 4096);
+  copy_to_user(procfs_buffer, result, 4096);
 
 
-static ssize_t procfile_read(struct file *filePointer, char __user *buffer,
+static ssize_t procfile_read(struct file *filePointer, char __user *procfs_buffer,
                              size_t buffer_length, loff_t *offset) {
   if (buffer_length < PROCFS_MAX_SIZE) {
     pr_info("Not enough space in buffer\n");
@@ -107,11 +107,11 @@ static ssize_t procfile_read(struct file *filePointer, char __user *buffer,
   mutex_lock(&args_mutex);
     if (struct_id == TCP) {
       mutex_unlock(&args_mutex);
-      return get_tcp_connections(*buffer);
+      return get_tcp_connections(*procfs_buffer);
     }
     if (struct_id == UNIX_SOCKETS) {
       mutex_unlock(&args_mutex);
-      return get_unix_sockets(*buffer);
+      return get_unix_sockets(*procfs_buffer);
     }
   }
   mutex_unlock(&args_mutex);
