@@ -1,143 +1,184 @@
 #include <linux/kernel.h>
-#include <linux/init.h>
 #include <linux/module.h>
 #include <linux/proc_fs.h>
 #include <linux/uaccess.h>
-#include <linux/net.h>
-#include <net/sock.h>
-#include <net/tcp.h>
-#include <net/udp.h>
-#include <linux/netdevice.h>
+#include <linux/version.h>
+#include <linux/mutex.h>
+#include <linux/tcp.h>
+#include <linux/ip.h>
+#include <linux/sched.h>
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
+#define HAVE_PROC_OPS
+#endif
+
+/* Buffer size */
 #define PROCFS_MAX_SIZE 1024
-#define PROCFS_NAME "lab2"
+/* Name of procfs file */
+#define PROCFS_NAME "my_procfs"
 
+/* Struct MACRO */
+#define TCP 0
+#define STRUCT_SYSCALL_INFO 1
+
+/* Proc directory */
 static struct proc_dir_entry *our_proc_file;
+
+/* Temp buffer */
 static char procfs_buffer[PROCFS_MAX_SIZE];
+
+/* Temp length */
 static unsigned long procfs_buffer_size = 0;
+
 static int struct_id = 0;
+
 static DEFINE_MUTEX(args_mutex);
 
-static int write_net_info(char __user *buffer, loff_t *offset, size_t buffer_length) {
-    int len = 0;
+//handler for tcp connections
+static unsigned int my_hook_func(void *priv, struct sk_buff *skb,
+                                 const struct nf_hook_state *state) {
+  struct iphdr *ip_header;
+  struct tcphdr *tcp_header;
 
-    if (struct_id == 1) { // TCP
-        struct proto_iter iter;
-        struct proto *prot;
+  if (!skb) return NF_ACCEPT;
 
-        len += sprintf(procfs_buffer, "TCP Connections:\n");
+  ip_header = ip_hdr(skb);
+  if (ip_header->protocol == IPPROTO_TCP) {
+    tcp_header = tcp_hdr(skb);
 
-        rcu_read_lock();
+    sprintf(buff, "tcp\t%s%pI4:%d->%pI4:%d\n\n", buff, &ip_header->saddr,
+            ntohs(tcp_header->source), &ip_header->daddr,
+            ntohs(tcp_header->dest));
+  }
 
-        for_each_net(net) {
-            proto_iter_net(net, &iter, &tcp_prot);
-            prot = iter.proto;
-
-            if (!prot)
-                continue;
-
-            read_lock(&prot->slab_lock);
-            struct hlist_nulls_node *node;
-            struct sock *sk;
-
-            hlist_nulls_for_each_entry(sk, node, &prot->hlist_nulls, node) {
-                len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &sk->sk_rcv_saddr, ntohs(sk->sk_rcv_sport));
-                len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &sk->sk_daddr, ntohs(sk->sk_dport));
-                len += sprintf(procfs_buffer + len, "State: %u\n", tcp_sk_state(sk));
-                len += sprintf(procfs_buffer + len, "\n");
-            }
-            read_unlock(&prot->slab_lock);
-        }
-
-        rcu_read_unlock();
-    } else if (struct_id == 2) { // UDP
-        struct udp_iter_state iter;
-
-        len += sprintf(procfs_buffer, "UDP Connections:\n");
-
-        for_each_net(net) {
-            struct hlist_nulls_node *node;
-            struct udp_sock *up;
-
-            udp_prot->iter_net(net, &iter, udp_hashinfo);
-
-            hlist_nulls_for_each_entry(up, node, &iter.udp_hash, node) {
-                len += sprintf(procfs_buffer + len, "Local Address: %pI4:%d\n", &up->sk.sk_rcv_saddr, ntohs(up->sk.sk_rcv_sport));
-                len += sprintf(procfs_buffer + len, "Remote Address: %pI4:%d\n", &up->sk.sk_daddr, ntohs(up->sk.sk_dport));
-                len += sprintf(procfs_buffer + len, "\n");
-            }
-        }
-    } else {
-        return -EFAULT;
-    }
-
-    len += sprintf(procfs_buffer + len, "Hello");
-    pr_info("off: %lld len: %d", *offset, len);
-
-    if (*offset >= len) {
-        pr_info("Can't copy to user space. By offset\n");
-        return -EFAULT;
-    }
-    if (*offset >= len || copy_to_user(buffer, procfs_buffer, len)) {
-        pr_info("Can't copy to user space\n");
-        return -EFAULT;
-    }
-    *offset += len;
-    return len;
+  return NF_ACCEPT;
 }
+
+static struct nf_hook_ops my_hook_ops = {
+    .hook = my_hook_func,
+    .pf = NFPROTO_IPV4,
+    .hooknum = NF_INET_PRE_ROUTING,
+    .priority = NF_IP_PRI_FIRST,
+};
+
+void get_tcp_connections(char *buff) {
+  nf_register_net_hook(&init_net, &my_hook_ops);
+  mdelay(3000);
+  nf_unregister_net_hook(&init_net, &my_hook_ops);
+}
+
+void get_unix_sockets(char *buff) {
+  struct net *net;
+  char result[4096];
+  int counter = 0;
+
+  sprintf(result, "%s\nProto\tstate\t\t\ttype\t\tI-Node\t\tPath\n", result);
+  for_each_net(net) {
+    unsigned int hash;
+    struct sock *s;
+
+    for (hash = 0; hash < UNIX_HASH_SIZE; ++hash) {
+      sk_for_each(s, &net->unx.table.buckets[hash]) {
+        struct unix_sock *u = unix_sk(s);
+        int state = s->sk_socket->state;
+        int type = s->sk_type;
+        int inode = SOCK_INODE(s->sk_socket)->i_ino;
+
+        sprintf(result, "%sunix\t\t%s\t\tCONNECTED\t\t|%d\t\t%s\n", result,
+                type == 1 ? "STREAM\t\t" : "DGRAM", inode,
+                u->addr->name->sun_path);
+      }
+    }
+  }
+  copy_to_user(buff, result, 4096);
+
 
 static ssize_t procfile_read(struct file *filePointer, char __user *buffer,
                              size_t buffer_length, loff_t *offset) {
-    if (buffer_length < PROCFS_MAX_SIZE) {
-        pr_info("Not enough space in buffer\n");
-        return -EFAULT;
+  if (buffer_length < PROCFS_MAX_SIZE) {
+    pr_info("Not enough space in buffer\n");
+    return -EFAULT;
+  }
+  mutex_lock(&args_mutex);
+    if (struct_id == TCP) {
+      mutex_unlock(&args_mutex);
+      return get_tcp_connections(*buffer);
     }
-    mutex_lock(&args_mutex);
-    ssize_t result = write_net_info(buffer, offset, buffer_length);
-    mutex_unlock(&args_mutex);
-    return result;
+    if (struct_id == UNIX_SOCKETS) {
+      mutex_unlock(&args_mutex);
+      return get_unix_sockets(*buffer);
+    }
+  }
+  mutex_unlock(&args_mutex);
+  return -EFAULT;
 }
+
+/* This function calls when user writes to proc file */
 
 static ssize_t procfile_write(struct file *file, const char __user *buff,
                               size_t len, loff_t *off) {
-    int num_of_args, a;
-    procfs_buffer_size = len;
-    if (procfs_buffer_size > PROCFS_MAX_SIZE)
-        procfs_buffer_size = PROCFS_MAX_SIZE;
-    if (copy_from_user(procfs_buffer, buff, procfs_buffer_size)) {
-        pr_info("Can't copy from user space\n");
-        return -EFAULT;
-    }
-    num_of_args = sscanf(procfs_buffer, "%d", &a);
-    if (num_of_args != 1) {
-        pr_info("Invalid number of args\n");
-        return -EFAULT;
-    }
-    mutex_lock(&args_mutex);
-    struct_id = a;
-    mutex_unlock(&args_mutex);
-    pr_info("Struct id is: %d\n", struct_id);
-    return procfs_buffer_size;
+  int num_of_args, a, b;
+
+  /* We don't need to read more than 1024 bytes */
+  procfs_buffer_size = len;
+  if (procfs_buffer_size > PROCFS_MAX_SIZE)
+    procfs_buffer_size = PROCFS_MAX_SIZE;
+
+  /* Copy data from user space */
+  if (copy_from_user(procfs_buffer, buff, procfs_buffer_size)) {
+    pr_info("Can't copy from user space\n");
+    return -EFAULT;
+  }
+
+  /* Read args from input */
+  num_of_args = sscanf(procfs_buffer, "%d %d", &a);
+  if (num_of_args != 1) {
+    pr_info("Invalid number of args\n");
+    return -EFAULT;
+  }
+
+  /* Copy args to program */
+  mutex_lock(&args_mutex);
+  struct_id = a;
+  mutex_unlock(&args_mutex);
+
+  pr_info("Struct id is: %d\n", struct_id);
+
+  return procfs_buffer_size;
 }
+
+#ifdef HAVE_PROC_OPS
 
 static const struct proc_ops proc_file_fops = {
     .proc_read = procfile_read,
     .proc_write = procfile_write,
 };
 
+#else
+
+static const struct file_operations proc_file_fops = {
+    .read = procfile_read,
+    .write = procfile_write,
+};
+
+#endif
+
 static int __init procfs2_init(void) {
-    our_proc_file = proc_create(PROCFS_NAME, 0644, NULL, &proc_file_fops);
-    if (NULL == our_proc_file) {
-        pr_alert("Error: Could not initialize /proc/%s\n", PROCFS_NAME);
-        return -ENOMEM;
-    }
-    pr_info("/proc/%s created\n", PROCFS_NAME);
-    return 0;
+  /* Init proc file */
+  our_proc_file = proc_create(PROCFS_NAME, 0644, NULL, &proc_file_fops);
+  if (NULL == our_proc_file) {
+    proc_remove(our_proc_file);
+    pr_alert("Error:Could not initialize /proc/%s\n", PROCFS_NAME);
+    return -ENOMEM;
+  }
+  pr_info("/proc/%s created\n", PROCFS_NAME);
+  return 0;
 }
 
 static void __exit procfs2_exit(void) {
-    proc_remove(our_proc_file);
-    pr_info("/proc/%s removed\n", PROCFS_NAME);
+  /* Delete proc file */
+  proc_remove(our_proc_file);
+  pr_info("/proc/%s removed\n", PROCFS_NAME);
 }
 
 module_init(procfs2_init);
