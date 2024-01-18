@@ -1,15 +1,9 @@
 obj-m += kmod.o
-
+ 
+PWD := $(CURDIR)
+ 
 all:
-	echo "Targets: clean, build, install"
-
-build:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
-
+    make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
+ 
 clean:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
-
-install: build
-	sudo rmmod kmod.ko
-	sudo insmod kmod.ko
-	sudo chmod 777 /proc/kmod
+    make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
