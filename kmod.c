@@ -98,7 +98,7 @@ void get_unix_sockets(char *procfs_buffer) {
   copy_to_user(procfs_buffer, result, 4096);
 
 
-static ssize_t procfile_read(struct file *file char __user *procfs_buffer,
+static ssize_t procfile_read(struct file *file, char __user *procfs_buffer,
                              size_t buffer_length, loff_t *offset) {
   if (buffer_length < PROCFS_MAX_SIZE) {
     pr_info("Not enough space in buffer\n");
@@ -111,7 +111,7 @@ static ssize_t procfile_read(struct file *file char __user *procfs_buffer,
     }
     if (struct_id == UNIX_SOCKETS) {
       mutex_unlock(&args_mutex);
-      return get_unix_sockets(procfs_buffer);
+      return get_unix_sockets(*procfs_buffer);
     }
   }
   mutex_unlock(&args_mutex);
