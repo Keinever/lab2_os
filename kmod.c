@@ -106,12 +106,12 @@ static ssize_t procfile_read(struct file *filePointer, char __user *buffer, size
   mutex_lock(&args_mutex);
     if (struct_id == TCP) {
       mutex_unlock(&args_mutex);
-      get_tcp_connections(&buffer);
+      get_tcp_connections(buffer);
       return 0;
     }
     if (struct_id == UNIX_SOCKETS) {
       mutex_unlock(&args_mutex);
-      get_unix_sockets(&buffer);
+      get_unix_sockets(buffer);
       return 0;
     }
   }
