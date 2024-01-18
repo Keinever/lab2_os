@@ -106,12 +106,12 @@ static ssize_t procfile_read(struct file *file, size_t buffer_length, loff_t *of
   mutex_lock(&args_mutex);
     if (struct_id == TCP) {
       mutex_unlock(&args_mutex);
-      get_tcp_connections(*procfs_buffer);
+      get_tcp_connections(procfs_buffer);
       return 0;
     }
     if (struct_id == UNIX_SOCKETS) {
       mutex_unlock(&args_mutex);
-      get_unix_sockets(*procfs_buffer);
+      get_unix_sockets(procfs_buffer);
       return 0;
     }
   }
@@ -123,7 +123,7 @@ static ssize_t procfile_read(struct file *file, size_t buffer_length, loff_t *of
 
 static ssize_t procfile_write(struct file *file, const char __user *buff,
                               size_t len, loff_t *off) {
-  int num_of_args, a, b;
+  int num_of_args, a;
 
   /* We don't need to read more than 1024 bytes */
   procfs_buffer_size = len;
