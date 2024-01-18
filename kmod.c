@@ -114,8 +114,8 @@ static ssize_t procfile_read(struct file *filePointer, char __user *buffer, size
       get_unix_sockets(buffer);
       return 0;
     }
-  }
   mutex_unlock(&args_mutex);
+  return -EFAULT;
 }
 
 /* This function calls when user writes to proc file */
